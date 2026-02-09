@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Analytics - Dados Reais</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* --- ESTILOS VISUAIS (Mantidos) --- */
+        :root {
+            --navy-blue: #1e3a8a; --navy-light: #2563eb; --slate-100: #f1f5f9;
+            --slate-500: #64748b; --white: #ffffff; --border: #e2e8f0;
+            --success: #10b981; --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif; background-color: #f8fafc;
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+
+        .container { width: 100%; max-width: 1000px; }
+
+        .header-box {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; background: var(--white); padding: 15px;
+            border-radius: 8px; border: 1px solid var(--border);
+        }
+
+        h2 { margin: 0; color: var(--navy-blue); font-size: 20px; }
+
+        .status-badge {
+            font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 20px;
+            background: var(--slate-100); color: var(--slate-500); display: flex; align-items: center; gap: 6px;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+        .status-badge.online { background: #dcfce7; color: #166534; }
+        .status-badge.online .status-dot { background: var(--success); }
+        .status-badge.error { background: #fee2e2; color: #991b1b; }
+        .status-badge.error .status-dot { background: var(--error); }
+
+        .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        
+        .card {
+            background: var(--white); padding: 15px; border-radius: 8px;
+            border-top: 4px solid var(--navy-light); box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .card-label { font-size: 10px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; }
+        .card-value { font-size: 24px; font-weight: 800; color: var(--navy-blue); }
+
+        .table-card {
+            background: var(--white); border-radius: 8px; overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid var(--border); min-height: 200px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--navy-blue); color: white; padding: 12px; text-align: left; font-size: 11px; text-transform: uppercase; }
+        td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+
+        .row-cat { background-color: var(--slate-100); font-weight: 700; cursor: pointer; color: var(--navy-blue); }
+        .row-cat td:first-child::before { content: "▶"; display: inline-block; width: 15px; font-size: 10px; transition: 0.2s; margin-right: 5px; }
+        .row-cat.open td:first-child::before { transform: rotate(90deg); }
+
+        .row-spec { display: none; }
+        .row-spec td:first-child { padding-left: 35px; color: var(--slate-500); }
+        
+        /* Destaque para a linha de total na tabela também */
+        .row-total { background: var(--navy-blue); color: white; font-weight: 800; }
+        .text-right { text-align: right; }
+
+        .loader-container { padding: 40px; text-align: center; }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid var(--navy-blue); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        footer {
+            margin-top: 20px; padding: 15px; background: var(--white); border-radius: 8px;
+            border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px; color: var(--slate-500);
+        }
+        .footer-tag { background: var(--slate-100); padding: 4px 10px; border-radius: 4px; color: var(--navy-blue); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-box">
+        <h2>Frequencia Tele</h2>
+        <div id="status-badge" class="status-badge">
+            <span class="status-dot"></span> <span id="status-text">Iniciando...</span>
+        </div>
+    </div>
+
+    <div class="kpi-row">
+        <div class="card"><div class="card-label">Consultas Efetivadas</div><div id="k-qtd" class="card-value">-</div></div>
+        <div class="card"><div class="card-label">Frequência</div><div id="k-freq" class="card-value">-</div></div>
+        <div class="card"><div class="card-label">Vidas</div><div id="k-vidas" class="card-value">-</div></div>
+    </div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th width="55%">Estrutura / Especialidade</th>
+                    <th class="text-right">Consultas Efetivadas</th>
+                    <th class="text-right">Freq</th>
+                    <th class="text-right">Vidas</th>
+                </tr>
+            </thead>
+            <tbody id="tableContent"></tbody>
+        </table>
+        <div id="loader" class="loader-container">
+            <div class="spinner"></div>
+            <div style="font-size: 12px; color: var(--slate-500)">Carregando dados...</div>
+        </div>
+    </div>
+
+    <footer>
+        <div>FONTE: <span class="footer-tag">T22G11</span></div>
+        <div>Atualizado: <span id="last-update" class="footer-tag">-</span></div>
+    </footer>
+</div>
+
+<script>
+    const SHEET_API_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ-jlmlDFfHrNsOtZ-L-XiCMCTZVd1Lz8cjeKtZmOEmeWK6TUBNireO-18pwHeEI-bBCj9-S6kNJN3I/pub?output=csv";
+    const CATEGORIES_REF = ["MEDICA", "DEMAIS PROGRAMAS", "TERAPIAS", "NAO MEDICA", "CASE"];
+
+    window.addEventListener('DOMContentLoaded', () => {
+        fetchData();
+        setInterval(fetchData, 300000);
+    });
+
+    async function fetchData() {
+        const loader = document.getElementById('loader');
+        const statusBadge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+
+        try {
+            // Proxy AllOrigins (JSON) - Estável e evita cache
+            const proxyUrl = 'https://api.allorigins.win/get?url=';
+            const finalUrl = proxyUrl + encodeURIComponent(SHEET_API_URL + "&rand=" + Math.random());
+
+            const response = await fetch(finalUrl);
+            if (!response.ok) throw new Error("Erro de rede ao acessar Proxy");
+
+            const json = await response.json();
+            let csvText = json.contents;
+
+            // Decodifica Base64 se necessário
+            if (csvText && csvText.startsWith("data:")) {
+                const base64Part = csvText.split(',')[1];
+                if (base64Part) {
+                    csvText = decodeURIComponent(escape(window.atob(base64Part)));
+                }
+            }
+
+            if(!csvText || csvText.includes("<!DOCTYPE html>")) {
+                throw new Error("Conteúdo inválido recebido.");
+            }
+
+            processData(csvText);
+
+            loader.style.display = 'none';
+            statusBadge.className = 'status-badge online';
+            statusText.innerText = "Conectado";
+            const now = new Date();
+            document.getElementById('last-update').innerText = now.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
+        } catch (error) {
+            console.error(error);
+            handleError(error.message);
+        }
+    }
+
+    function handleError(msg) {
+        const loader = document.getElementById('loader');
+        const statusBadge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+        const tbody = document.getElementById('tableContent');
+
+        loader.style.display = 'none';
+        statusBadge.className = 'status-badge error';
+        statusText.innerText = "Falha";
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px; color:#ef4444;">${msg}</td></tr>`;
+    }
+
+    function clean(text) {
+        if(!text) return "";
+        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+    }
+
+    function processData(csvText) {
+        const lines = csvText.split(/\r?\n/);
+        const tbody = document.getElementById('tableContent');
+        tbody.innerHTML = '';
+
+        let currentGroupId = 0;
+        let hasData = false;
+
+        lines.forEach(line => {
+            if(!line.trim()) return;
+
+            // Divide por vírgula, respeitando aspas
+            const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+            
+            if (cols.length < 2) return;
+
+            const labelRaw = cols[0];
+            const labelClean = clean(labelRaw);
+            
+            if(labelClean.includes("ESTRUTURA") || labelClean.includes("ESPECIALIDADE")) return;
+
+            const isCategory = CATEGORIES_REF.includes(labelClean);
+            // Identifica a linha que contém "TOTAL" (Total Geral, Total, etc)
+            const isTotal = labelClean.includes("TOTAL");
+
+            const tr = document.createElement('tr');
+
+            if (isCategory) {
+                currentGroupId++; 
+                tr.className = 'row-cat';
+                const groupId = `group-${currentGroupId}`;
+                tr.onclick = () => {
+                    tr.classList.toggle('open');
+                    document.querySelectorAll(`.${groupId}`).forEach(el => {
+                        el.style.display = tr.classList.contains('open') ? 'table-row' : 'none';
+                    });
+                };
+                renderRow(tr, labelRaw, cols);
+
+            } else if (isTotal) {
+                // AQUI ESTÁ O SEGREDO:
+                // 1. Renderiza a linha na tabela com destaque
+                tr.className = 'row-total';
+                renderRow(tr, labelRaw, cols); // Usa o nome original da planilha
+
+                // 2. PEGA OS DADOS DESSA LINHA E JOGA DIRETO NOS CARDS
+                // Sem somar, sem dividir, sem média. Copia e cola.
+                updateKPIs(cols[1], cols[2], cols[3]);
+
+            } else {
+                const safeGroupId = currentGroupId === 0 ? 1 : currentGroupId;
+                tr.className = `row-spec group-${safeGroupId}`;
+                if(currentGroupId === 0) tr.style.display = 'table-row'; 
+                renderRow(tr, labelRaw, cols);
+            }
+            tbody.appendChild(tr);
+            hasData = true;
+        });
+
+        if(!hasData) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px;">Nenhum dado encontrado.</td></tr>`;
+        }
+    }
+
+    function updateKPIs(qtd, freq, vidas) {
+        // Se vier vazio, coloca um traço. Se vier valor, coloca o valor.
+        document.getElementById('k-qtd').innerText = qtd || '-';
+        document.getElementById('k-freq').innerText = freq || '-';
+        document.getElementById('k-vidas').innerText = vidas || '-';
+    }
+
+    function renderRow(tr, label, cols) {
+        tr.innerHTML = `
+            <td>${label}</td>
+            <td class="text-right">${cols[1]||'0'}</td>
+            <td class="text-right">${cols[2]||'0,00'}</td>
+            <td class="text-right">${cols[3]||'0'}</td>
+        `;
+    }
+</script>
+
+</body>
+</html>
